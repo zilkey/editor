@@ -2,9 +2,13 @@ function makeEditor() {
   var commands = [];
   var position = 0;
 
-  function command(object){
+  function clearRedos() {
     var diff = commands.length - Math.max(position, 0);
     for (var i = 0; i < diff; i++) commands.pop();
+  }
+
+  function command(object){
+    clearRedos();
     commands.push(object);
     position++;
   }
@@ -68,6 +72,10 @@ describe('Editor', function () {
 
     editor.write("!");
     editor.write("!");
+    expect(editor.toString()).to.eq("more code more problems!!");
+
+    editor.undo();
+    editor.redo();
     expect(editor.toString()).to.eq("more code more problems!!");
 
     editor.undo();

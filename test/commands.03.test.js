@@ -1,52 +1,67 @@
+// update currentState on write / replace without replaying commands
+// rebuild from the ground up on undo
+// only reapply the next command on redo
+
 function makeEditor() {
   var commands = [];
   var position = 0;
-  var current = '';
-
-  function cache(){
-    current = "";
-    for (var i = 0; i < position; i++) {
-      if (commands[i].replace) {
-        current = current.replace(new RegExp(commands[i].replace, 'g'), commands[i].with)
-      } else {
-        current += commands[i].write;
-      }
-    }
-  }
+  var currentState = '';
 
   function clearRedos() {
     var diff = commands.length - Math.max(position, 0);
     for (var i = 0; i < diff; i++) commands.pop();
   }
 
-  function command(object){
+  function recordCommand(object){
     clearRedos();
     commands.push(object);
     position++;
-    cache();
+  }
+
+  function rebuild() {
+    currentState = "";
+    for (var i = 0; i < position; i++) {
+      if (commands[i].replace) {
+        currentState = currentState.replace(new RegExp(commands[i].replace, 'g'), commands[i].with)
+      } else {
+        currentState += commands[i].write;
+      }
+    }
   }
 
   return {
     toString : function() {
-      return current;
+      return currentState;
     },
 
+    // clearsRedos, records the command and appends to the end of the cached string
     write : function(letters) {
-      command({write: letters});
+      recordCommand({write: letters});
+      currentState += letters;
     },
 
+    // clears the redos, records the command and executes the replace
     replace : function(from, to) {
-      command({replace: from, with: to});
+      recordCommand({replace: from, with: to});
+      currentState = currentState.replace(new RegExp(from, 'g'), to);
     },
 
+    // for undoing a write, it hacks off the previously written string
+    // for undoing replaces, it replays all commands from the beginning
     undo : function() {
       position--;
-      cache();
+      var command = commands[position];
+      if (command.replace) {
+        rebuild();
+      } else {
+        currentState = currentState.substring(0, currentState.length - command.write.length);
+      }
     },
 
+    // determine which method to call based on the next command
     redo : function() {
-      position++;
-      cache();
+      var command = commands[position];
+      command.replace ? this.replace(command.replace, command.with) : this.write(command.write);
     }
   }
 }
