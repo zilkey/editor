@@ -49,6 +49,7 @@ function makeEditor() {
     // for undoing a write, it hacks off the previously written string
     // for undoing replaces, it replays all commands from the beginning
     undo : function() {
+      if (position === 0) return;
       position--;
       var command = commands[position];
       if (command.replace) {
@@ -60,8 +61,13 @@ function makeEditor() {
 
     // determine which method to call based on the next command
     redo : function() {
-      var command = commands[position];
-      command.replace ? this.replace(command.replace, command.with) : this.write(command.write);
+      if (position === commands.length) return;
+      var command = commands[position++];
+      if (command.replace) {
+        currentState = currentState.replace(new RegExp(command.replace, 'g'), command.with);
+      } else {
+        currentState += command.write;
+      }
     }
   }
 }
@@ -121,6 +127,43 @@ describe('Editor', function () {
 
     editor.undo();
     expect(editor.toString()).to.eq("mo' money mo' problems");
+  });
+
+  it("makes noops for undo / redo commands beyond their bounds", function () {
+    var editor = makeEditor();
+    editor.write("foo")
+
+    editor.undo()
+    expect(editor.toString()).to.eq("");
+
+    editor.undo()
+    expect(editor.toString()).to.eq("");
+
+    editor.redo()
+    expect(editor.toString()).to.eq("foo");
+
+    editor.redo()
+    expect(editor.toString()).to.eq("foo");
+  })
+
+  it("replaces correctly", function () {
+    var editor = makeEditor();
+
+    editor.write("more modern code")
+    editor.replace("more", "mo")
+    expect(editor.toString()).to.eq("mo modern code");
+
+    editor.undo()
+    expect(editor.toString()).to.eq("more modern code");
+
+    editor.undo()
+    expect(editor.toString()).to.eq("");
+
+    editor.redo()
+    expect(editor.toString()).to.eq("more modern code");
+
+    editor.redo()
+    expect(editor.toString()).to.eq("mo modern code");
   });
 
 })

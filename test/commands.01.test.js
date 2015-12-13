@@ -40,11 +40,13 @@ function makeEditor() {
     },
 
     undo : function() {
+      if (position === 0) return;
       position--;
       cache();
     },
 
     redo : function() {
+      if (position === commands.length) return;
       position++;
       cache();
     }
@@ -106,6 +108,43 @@ describe('Editor', function () {
 
     editor.undo();
     expect(editor.toString()).to.eq("mo' money mo' problems");
+  });
+
+  it("makes noops for undo / redo commands beyond their bounds", function () {
+    var editor = makeEditor();
+    editor.write("foo")
+
+    editor.undo()
+    expect(editor.toString()).to.eq("");
+
+    editor.undo()
+    expect(editor.toString()).to.eq("");
+
+    editor.redo()
+    expect(editor.toString()).to.eq("foo");
+
+    editor.redo()
+    expect(editor.toString()).to.eq("foo");
+  })
+
+  it("replaces correctly", function () {
+    var editor = makeEditor();
+
+    editor.write("more modern code")
+    editor.replace("more", "mo")
+    expect(editor.toString()).to.eq("mo modern code");
+
+    editor.undo()
+    expect(editor.toString()).to.eq("more modern code");
+
+    editor.undo()
+    expect(editor.toString()).to.eq("");
+
+    editor.redo()
+    expect(editor.toString()).to.eq("more modern code");
+
+    editor.redo()
+    expect(editor.toString()).to.eq("mo modern code");
   });
 
 })

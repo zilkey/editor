@@ -18,6 +18,21 @@ function makeEditor() {
     position++;
   }
 
+  function replace(from, to){
+    var ranges = [],
+        startIndex = currentState.indexOf(from),
+        distance = to.length - from.length,
+        i = 0;
+
+    while(~startIndex) {
+      ranges.push(startIndex + (i * distance));
+      startIndex = currentState.indexOf(from, startIndex + from.length);
+      i++;
+    }
+    currentState = currentState.replace(new RegExp(from, 'g'), to);
+    return ranges;
+  }
+
   return {
 
     // runs in constant time
@@ -32,21 +47,12 @@ function makeEditor() {
     },
 
     replace : function(from, to) {
-      var ranges = [],
-          startIndex = currentState.indexOf(from),
-          distance = to.length - from.length,
-          i = 0;
-
-      while(~startIndex) {
-        ranges.push(startIndex + (i * distance));
-        startIndex = currentState.indexOf(from, startIndex + from.length);
-        i++;
-      }
+      var ranges = replace(from, to)
       recordCommand({replace: from, with: to, ranges: ranges});
-      currentState = currentState.replace(new RegExp(from, 'g'), to);
     },
 
     undo : function() {
+      if (position === 0) return;
       position--;
       var command = commands[position];
       if (command.replace) {
@@ -64,8 +70,13 @@ function makeEditor() {
 
     // determine which method to call based on the next command
     redo : function() {
-      var command = commands[position];
-      command.replace ? this.replace(command.replace, command.with) : this.write(command.write);
+      if (position === commands.length) return;
+      var command = commands[position++];
+      if (command.replace) {
+        replace(command.replace, command.with);
+      } else {
+        currentState += command.write;
+      }
     }
   }
 }
@@ -125,6 +136,43 @@ describe('Editor', function () {
 
     editor.undo();
     expect(editor.toString()).to.eq("mo' money mo' problems");
+  });
+
+  it("makes noops for undo / redo commands beyond their bounds", function () {
+    var editor = makeEditor();
+    editor.write("foo")
+
+    editor.undo()
+    expect(editor.toString()).to.eq("");
+
+    editor.undo()
+    expect(editor.toString()).to.eq("");
+
+    editor.redo()
+    expect(editor.toString()).to.eq("foo");
+
+    editor.redo()
+    expect(editor.toString()).to.eq("foo");
+  })
+
+  it("replaces correctly", function () {
+    var editor = makeEditor();
+
+    editor.write("more modern code")
+    editor.replace("more", "mo")
+    expect(editor.toString()).to.eq("mo modern code");
+
+    editor.undo()
+    expect(editor.toString()).to.eq("more modern code");
+
+    editor.undo()
+    expect(editor.toString()).to.eq("");
+
+    editor.redo()
+    expect(editor.toString()).to.eq("more modern code");
+
+    editor.redo()
+    expect(editor.toString()).to.eq("mo modern code");
   });
 
 })
